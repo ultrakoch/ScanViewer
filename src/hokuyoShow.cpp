@@ -789,15 +789,15 @@ public:
              }
              else
              {
-               colors_scan[3*i]     = 100;                         // r
-               colors_scan[3*i+1]   = 0;                     // g
+               colors_scan[3*i]     = 255;                         // r
+               colors_scan[3*i+1]   = 100;                     // g
                colors_scan[3*i+2]   = 0;                         // b
              }
 
              // Build vtkCloud
              data_scan[3*i]       = sin(urg.index2rad(i)) * dist[i];  // x
              data_scan[3*i + 1]   = cos(urg.index2rad(i)) * dist[i];  // y
-             data_scan[3*i + 2]   = intens[i]/100;                     // z
+             data_scan[3*i + 2]   = intens[i]/10;                     // z
            }
            break;
          case 2:
