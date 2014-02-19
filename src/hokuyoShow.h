@@ -17,7 +17,7 @@ void save_xy_intens(std::vector<long>& distance, std::vector<unsigned short>& in
 void save_raw_mulitintens(std::vector<long>& distance, std::vector<unsigned short>& intensity);
 void save_xy_mulitintens(std::vector<long>& distance, std::vector<unsigned short>& intensity);
 
-void createCupe(int cubesize);
+void createCube(int cubesize);
 
 /* read from x,y file
  *
@@ -29,6 +29,6 @@ void stopLaser();
 
 void cbSave();
 void cbMeasuretype();
-
+void filter(double* distance, unsigned char* colors, double* intensity);
 
 

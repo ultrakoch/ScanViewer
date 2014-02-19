@@ -40,14 +40,14 @@ using namespace obvious;
 
 /* Default parameters for file*/
    char* file;
-   int filetype;
+   string filetype;
    int measure_type;
    unsigned int file_nr = 0;
    bool _save = true;
 
  /* Default parameters for viewer */
    std::vector<long> dist;
-   double* intens;
+   float* intens;
    VtkCloud* cloud_scan;
    VtkCloud* cloud_mirror;
    VtkCloud* cloud_sensor;
@@ -82,12 +82,12 @@ void init(int argc, char* argv[])
 {
   if(argc<3)
   {
-     cout << "usage: " << argv[0] << "[filename] [0= xy, 1=xyz] [measurements(0=data, 1=data+intensity, 2=multi_echo_data, 3=multi_echo_data+intensities)]" << endl;
+     cout << "usage: " << argv[0] << "[filename] [txt_xy, rxp ] [measurements(0=data, 1=data+intensity, 2=multi_echo_data, 3=multi_echo_data+intensities)]" << endl;
   }
   else
   {
    file = argv[1];
-   filetype = atoi(argv[2]);
+   filetype = argv[2];
    measure_type = atoi(argv[3]);
 
    cout << "Load file" << file << endl;
@@ -147,7 +147,7 @@ void createCube(int cubesize)
 }
 
 
-void filter(double* distance, unsigned char* colors, double* intensity)
+void filter(double* distance, unsigned char* colors, float* intensity)
 {
 
   float distance_refl = 0.0;
@@ -225,9 +225,8 @@ void filter(double* distance, unsigned char* colors, double* intensity)
 
 int load_xy_file(char* filename)
 {
-  // Read X,Y file
-      float x, y, z, degree;
-      double intensity;
+  // Read txt file with x, y
+      float x, y, z, degree, intensity;
       string leseString;
       ifstream file(filename);
       int echoCount = 0;
@@ -466,11 +465,10 @@ int load_xy_file(char* filename)
         return id;
 }
 
-int load_xyz_file(char* filename)
+int load_rxp_file(char* filename)
 {
-  // Read X,Y file
-      float x, y, z, degree;
-      double intensity;
+  // Read rxp file
+      float x, y, z, degree, intensity, amplitude, deviation;
       string leseString;
       ifstream file(filename);
       int echoCount = 0;
@@ -486,7 +484,7 @@ int load_xyz_file(char* filename)
          {
            linesFile++;
          }
-         id = linesFile -1;
+         id = linesFile -2; // Header have two lines
          cout << "lines: " << linesFile << endl;
          linesFile = 0;
          data_scan   = new double[id * 3]; // linesFile - header
@@ -496,17 +494,20 @@ int load_xyz_file(char* filename)
          // print file header and remove it
          getline(file, leseString);
          cout << "Fileheader:" << leseString << endl;
+         cout << "Fileheader:" << leseString << endl;
+
          for(leseString; getline(file, leseString);)
          {
-           istringstream(leseString,ios_base::in) >> x >> y >> z >> intensity;
+           istringstream(leseString,ios_base::in) >> x >> y >> z >> intensity >> amplitude >> deviation;
 
            // Build vtkCloud
-           data_scan[3*linesFile]       = x;  // x
-           data_scan[3*linesFile + 1]   = y;  // y
-           data_scan[3*linesFile + 2]   = z;                                  // z
+           data_scan[3*linesFile]       = x;
+           data_scan[3*linesFile + 1]   = y;
+           data_scan[3*linesFile + 2]   = z;
 
            intensity_scan[linesFile] = intensity;
 
+// TODO: Amplitude and deviation not used yet
 
            if(intensity<= 3000)
            {
@@ -522,7 +523,7 @@ int load_xyz_file(char* filename)
            }
            else if (intensity > 4000)
            {
-             colors_scan[3*linesFile]     = 100lz;                         // r
+             colors_scan[3*linesFile]     = 100;                         // r
              colors_scan[3*linesFile+1]   = 100;                     // g
              colors_scan[3*linesFile+2]   = 100;                         // b
 
@@ -596,7 +597,14 @@ int main(int argc, char* argv[])
    data_mirror   = new double[cloudsize * 3 * 3];
    colors_mirror = new unsigned char[cloudsize * 3 * 3];
 
-   cloudsize = load_xy_file(file);
+   if(filetype.compare("txt_xy"))
+     cloudsize = load_xy_file(file);
+   else if(filetype.compare("rxp"))
+     cloudsize = load_rxp_file(file);
+   else
+     cout << "Can not load filetype " << filetype << endl;
+
+   if (cloudsize!=0)
    cout << "File " << file << " loaded" << endl;
 
 

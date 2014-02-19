@@ -10,18 +10,24 @@
 void createCube(int cubesize);
 
 /*
- * read from x,y file
+ * read from txt file
+ * x, y
  * */
 int load_xy_file(char* filename);
 /*
- * read from x,y,z file
+ * read from txt file
+ * x, y, z
  * */
 int load_xyz_file(char* filename);
+/*
+ * read from rxp file
+ * x, y, z, reflectance, amplitude, deviation
+ * */
+int load_rxp_file(char* filename);
 
 /*
  * filter to detect reflections
  * */
-
-void filter(double* distance, unsigned char* colors, double* intensity);
+void filter(double* distance, unsigned char* colors, float* intensity);
 
 

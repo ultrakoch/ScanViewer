@@ -10,7 +10,7 @@
 #include <iostream>
 #include <fstream>
 #include <sstream>
-#include <string>
+#include <string.h>
 #include <memory>
 #include <stdlib.h>
 #include <math.h>
@@ -60,14 +60,13 @@ using namespace obvious;
    double* data_scan;
    double* data_mirror;
    double* data_sensor;
+   double* intensity_scan;
 
    double* sensorPos;
    unsigned char* colors_scan;
    unsigned char* colors_mirror;
    unsigned char* colors_sensor;
    unsigned char intensColor;
-
-
 
    Obvious3D* viewer3D = new Obvious3D();
    bool _pause = false;
@@ -100,7 +99,7 @@ void init(int argc, char* argv[])
    {
       if(argc!=5)
       {
-         cout << "usage: " << argv[0] << " [type (0=Serial 1=Ethernet 2=File)] [ip/dev/filename] [port/baudrate/0] [measurements(0=data, 1=data+intensity, 2=multi_echo_data, 3=multi_echo_data+intensities)" << endl;
+         cout << "usage: " << argv[0] << " [type (0=Serial 1=Ethernet 2=File)] [ip/dev/filename] [port/baudrate/0] [measurements(0=data, 1=data+intensity, 2=multi_echo_data, 3=multi_echo_data+intensities)]" << endl;
       }
       dev           = argv[2];
       port_rate     = atoi(argv[3]);
@@ -126,6 +125,8 @@ void init(int argc, char* argv[])
       meas_type =  Lidar::Multiecho_intensity;
       cout << "Multiecho + Intensity" << endl;
       break;
+    case 4:
+      meas_type =  Lidar::Distance_intensity;
     default:
       meas_type =  Lidar::Distance;
       cout << "Default: Distance" << endl;
@@ -335,9 +336,8 @@ void save_xy_mulitintens(std::vector<long>& distance, std::vector<unsigned short
     cnt++;
 }
 
-void createCupe(int cubesize)
+void createCube(int cubesize)
 {
-  cout << "be here" << endl;
   //VtkCloud* cloud_cube;
   //cloud_cube = new VtkCloud();
   double* data_cube;
@@ -369,8 +369,6 @@ void createCupe(int cubesize)
 
   cloud_sensor->setCoords(data_cube, (cubesize*cubesize*cubesize), 3);
   cloud_sensor->setColors(color_cube, (cubesize*cubesize*cubesize), 3);
-  cout << "be here done" << endl;
-
 }
 void startLaser()
 {
@@ -403,16 +401,98 @@ void stopLaser()
   urg.close();
 }
 
+
+//   double* data_scan;
+//   unsigned char* colors_scan;
+//    double* intensity_scan;
+
+void filter(double* distance, unsigned char* colors, std::vector<unsigned short>&  intensity)
+{
+
+  float distance_refl = 0.0;
+  float angle_refl = 0.0;
+  float angle_refl_g = 0.0;
+
+  float distance_orig = 0.0;
+  float angle_orig = 0.0;
+  float angle_orig_g = 0.0;
+
+  unsigned int id_orig = 0;
+
+
+    for(int i=0; i<=raysPscan; i++)
+    {
+      // threshold for intensity
+      if(intensity[i] > 2700)
+      {
+        // recalculate original point id
+        id_orig = abs(raysPscan-i);
+//           cout << "id_refl: " << i << " id_orig: " << id_orig << endl;
+
+        // calculate vector
+        //TODO: later expand with z => sqrt(x2+y2+z2)
+        distance_refl = sqrt(((distance[3*i])*(distance[3*i])) + (distance[3*i+1]*distance[3*i+1]));
+        angle_refl_g = asin(distance[3*i]/distance_refl*1.0)/M_PI*360;
+        angle_refl = asin(distance[3*i]/distance_refl*1.0);
+
+        distance_orig = sqrt(((distance[3*id_orig])*(distance[3*id_orig])) + (distance[3*id_orig+1]*distance[3*id_orig+1]));
+        angle_orig_g = abs(360.0-angle_refl);
+        angle_refl = M_PI-asin(distance[3*i]/distance_refl*1.0);
+
+
+        // mark reflected point
+        colors[3*i]     = 100;                         // r
+        colors[3*i +1]   = 0;                     // g
+        colors[3*i +2]   = 0;                         // b
+
+//        // mark original point
+//        colors_scan[3*id_orig]     = 100;                         // r
+//        colors_scan[3*id_orig +1]   = 0;                     // g
+//        colors_scan[3*id_orig +2]   = 100;                         // b
+
+        // calculate mirror plane
+        data_mirror[3*i] = abs(distance_orig-distance_refl)*sin(angle_refl);
+        data_mirror[3*i+1] = abs(distance_orig-distance_refl)*cos(angle_refl);
+        data_mirror[3*i+2] = 0;
+
+        colors_mirror[3*i]     = 50;                         // r
+        colors_mirror[3*i +1]   = 200;                     // g
+        colors_mirror[3*i +2]   = 50;                         // b
+
+        if(test==0)
+        {
+          cout << " dist ref: " << distance_refl << " dist orig: " << distance_orig << endl;
+          cout << " id_refl: " << i << " id_orig: " << id_orig << endl;
+          cout << " angl_refl: " << angle_refl << " angl_orig: " << angle_orig << endl;
+          cout << " angl_refl: " << angle_refl_g << "° angl_orig: " << angle_orig_g << "°" << endl;
+          cout << " x_refl: " << distance[3*i] << " y_ref: " << distance[3*i+1] << endl;
+          //cout << " x_orig: " << distance[3*id_orig] << " y_orig: " << distance[3*id_orig+1] << endl;
+          cout << " x_mirr: " << data_mirror[3*i] << " y_mirr: " << data_mirror[3*i+1] << endl << endl << endl;
+        }
+      }
+
+    test = 1;
+
+    /* Set recalculated mirro plane */
+    cloud_mirror->setCoords(data_mirror, cloudsize, 3);
+    cloud_mirror->setColors(colors_mirror, cloudsize, 3);
+
+  }
+
+  }
+
+
 int load_xy_file(char* filename)
 {
   // Read X,Y file
-      float x, y, degree, intensity;
+      float x, y, z, degree;
+      double intensity;
       string leseString;
       ifstream file(filename);
       int echoCount = 0;
       max_tmp = 32767;
-      unsigned int linesFile;
-      unsigned int id;
+      unsigned int linesFile = 0;
+      unsigned int id = 0;
 
         switch(measure_type)
         {
@@ -427,14 +507,14 @@ int load_xy_file(char* filename)
               linesFile++;
             }
             id = linesFile -1;
-            linesFile = 0;
             //cout << "lines: " << linesFile << endl;
+            linesFile = 0;
             data_scan   = new double[id * 3]; // linesFile - header
             colors_scan = new unsigned char[id * 3];
             std::ifstream file(filename);
             // print file header and remove it
             getline(file, leseString);
-            cout << "Fileheader:" << leseString << endl;
+          //  cout << "Fileheader:" << leseString << endl;
             for(leseString; getline(file, leseString);)
             {
               istringstream(leseString,ios_base::in) >> x >> y;
@@ -462,9 +542,10 @@ int load_xy_file(char* filename)
               linesFile++;
             }
             id = linesFile -1;
+            cout << "lines: " << linesFile << endl;
             linesFile = 0;
-            //cout << "lines: " << linesFile << endl;
             data_scan   = new double[id * 3]; // linesFile - header
+            intensity_scan   = new double[id]; // linesFile - header
             colors_scan = new unsigned char[id * 3];
             std::ifstream file(filename);
             // print file header and remove it
@@ -479,7 +560,8 @@ int load_xy_file(char* filename)
               data_scan[3*linesFile + 1]   = y;  // y
               data_scan[3*linesFile + 2]   = 0;                                  // z
 
-              intens[linesFile] = intensity;
+              intensity_scan[linesFile] = intensity;
+
 
               if(intensity<= 3000)
               {
@@ -505,7 +587,7 @@ int load_xy_file(char* filename)
                 colors_scan[3*abs_id +2]   = 100;                         // b
 
               }
-              //cout << "data_scan id: " << linesFile << " x: " << data_scan[3*linesFile] << "y: " << data_scan[3*linesFile+1] << endl;
+              cout << "data_scan id: " << linesFile << " x: " << data_scan[3*linesFile] << " y: " << data_scan[3*linesFile+1] << " int: " << intensity_scan[linesFile] << endl;
               linesFile++;
              }
           }
@@ -599,7 +681,7 @@ int load_xy_file(char* filename)
               // Build vtkCloud
               data_scan[3*linesFile]       = x;  // x
               data_scan[3*linesFile + 1]   = y;  // y
-              intens[linesFile] = intensity;
+              intensity_scan[linesFile] = intensity;
 
               intensColor = intensity/max_tmp*256;
 
@@ -639,6 +721,41 @@ int load_xy_file(char* filename)
              }
           }
           break;
+        case 4:
+           /* read single distance */
+           if(!filename)
+             cerr << "Eingabe-Datei kann nicht geöffnet werden\n";
+           else
+           {
+             for(leseString; getline(file, leseString);)
+             {
+               linesFile++;
+             }
+             id = linesFile -1;
+             //cout << "lines: " << linesFile << endl;
+             linesFile = 0;
+             data_scan   = new double[id * 3]; // linesFile - header
+             colors_scan = new unsigned char[id * 3];
+             std::ifstream file(filename);
+             // print file header and remove it
+             getline(file, leseString);
+           //  cout << "Fileheader:" << leseString << endl;
+             for(leseString; getline(file, leseString);)
+             {
+               istringstream(leseString,ios_base::in) >> x >> y >> z;
+               // Build vtkCloud
+               data_scan[3*linesFile]       = x;  // x
+               data_scan[3*linesFile + 1]   = y;  // y
+               data_scan[3*linesFile + 2]   = z;                                  // z
+
+               colors_scan[3*linesFile]     = 200;                                // r
+               colors_scan[3*linesFile+1]   = 200;                                // g
+               colors_scan[3*linesFile+2]   = 200;                                // b
+               //cout << "data id: " << linesFile << " x: " << data[3*linesFile] << "y: " << data[3*linesFile+1] << endl;
+               linesFile++;
+              }
+           }
+           break;
         }
         return id;
 }
@@ -889,79 +1006,10 @@ public:
          }
       }
 
+
 /* Filter */
-
-      float distance_refl = 0.0;
-      float angle_refl = 0.0;
-      float angle_refl_g = 0.0;
-
-      float distance_orig = 0.0;
-      float angle_orig = 0.0;
-      float angle_orig_g = 0.0;
-
-      unsigned int id_orig = 0;
-
       if(_filterSwitch && measure_type == 1)
-      {
-        for(int i=0; i<=raysPscan; i++)
-        {
-          // threshold for intensity
-          if(intens[i] > 2700)
-          {
-            // recalculate original point id
-            id_orig = abs(raysPscan-i);
- //           cout << "id_refl: " << i << " id_orig: " << id_orig << endl;
-
-            // calculate vector
-            //TODO: later expand with z => sqrt(x2+y2+z2)
-            distance_refl = sqrt(((data_scan[3*i])*(data_scan[3*i])) + (data_scan[3*i+1]*data_scan[3*i+1]));
-            angle_refl_g = asin(data_scan[3*i]/distance_refl*1.0)/M_PI*360;
-            angle_refl = asin(data_scan[3*i]/distance_refl*1.0);
-
-            distance_orig = sqrt(((data_scan[3*id_orig])*(data_scan[3*id_orig])) + (data_scan[3*id_orig+1]*data_scan[3*id_orig+1]));
-            angle_orig_g = abs(360.0-angle_refl);
-            angle_refl = M_PI-asin(data_scan[3*i]/distance_refl*1.0);
-
-
-            // mark reflected point
-            colors_scan[3*i]     = 100;                         // r
-            colors_scan[3*i +1]   = 0;                     // g
-            colors_scan[3*i +2]   = 0;                         // b
-
-            // mark original point
-            colors_scan[3*id_orig]     = 100;                         // r
-            colors_scan[3*id_orig +1]   = 0;                     // g
-            colors_scan[3*id_orig +2]   = 100;                         // b
-
-            // calculate mirror plane
-            data_mirror[3*i] = abs(distance_orig-distance_refl)*sin(angle_refl);
-            data_mirror[3*i+1] = abs(distance_orig-distance_refl)*cos(angle_refl);
-            data_mirror[3*i+2] = 0;
-
-            colors_mirror[3*i]     = 50;                         // r
-            colors_mirror[3*i +1]   = 200;                     // g
-            colors_mirror[3*i +2]   = 50;                         // b
-
-            if(test==0)
-            {
-              cout << " dist ref: " << distance_refl << " dist orig: " << distance_orig << endl;
-              cout << " id_refl: " << i << " id_orig: " << id_orig << endl;
-              cout << " angl_refl: " << angle_refl << " angl_orig: " << angle_orig << endl;
-              cout << " angl_refl: " << angle_refl_g << "° angl_orig: " << angle_orig_g << "°" << endl;
-              cout << " x_refl: " << data_scan[3*i] << " y_ref: " << data_scan[3*i+1] << endl;
-              cout << " x_orig: " << data_scan[3*id_orig] << " y_orig: " << data_scan[3*id_orig+1] << endl;
-              cout << " x_mirr: " << data_mirror[3*i] << " y_mirr: " << data_mirror[3*i+1] << endl << endl << endl;
-            }
-          }
-        }
-
-        test = 1;
-
-        /* Set recalculated mirro plane */
-        cloud_mirror->setCoords(data_mirror, cloudsize, 3);
-        cloud_mirror->setColors(colors_mirror, cloudsize, 3);
-
-      }
+        filter(data_scan, colors_scan, intens);
 
 /* Set new cloud*/
         cloud_scan->setCoords(data_scan, cloudsize, 3);
@@ -999,9 +1047,12 @@ int main(int argc, char* argv[])
 
    /* Show sensor */
    cloud_sensor = new VtkCloud();
-   createCupe(sensorsize);
+   createCube(sensorsize);
+   cout << "Cube created" << endl;
+
    /* Show axes */
    viewer3D->showAxes(true);
+   cout << "Axes created" << endl;
 
    // size = data_size_Scanner * 3_echos * 3_koordinates
    data_mirror   = new double[cloudsize * 3 * 3];
@@ -1017,6 +1068,8 @@ int main(int argc, char* argv[])
    else if(sourcetype == 1)
    {
      cloudsize = load_xy_file(file);
+     cout << "File " << file << " loaded" << endl;
+
    }
 
    // define update timer
