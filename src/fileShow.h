@@ -6,7 +6,7 @@
 * Load different file clouds to filter reflections
 */
 
-
+void testfkt();
 void createCube(int cubesize);
 
 /*
@@ -44,7 +44,7 @@ int load_rxp_file(char* filename);
 /*
  * filter to detect reflections
  * */
-void filter(double* distance, unsigned char* colors, float* intensity);
+void filter(double* distance, unsigned char* colors, double* intensity, int cloudsize);
 /*
  * max. limits for data
  */
