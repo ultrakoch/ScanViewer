@@ -305,6 +305,7 @@ void filter(double* distance, unsigned char* colors, double* intensity, int clou
 // Mirror Plane
   //addPlane(double origin[3], double axis1[3], double axis2[3], unsigned int resX, unsigned int resY, double rgb[])
 
+
   double axis1[3];
   axis1[0] = 0.0;
   axis1[1] = 0.0;
