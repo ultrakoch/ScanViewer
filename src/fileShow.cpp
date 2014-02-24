@@ -65,15 +65,6 @@ using namespace obvious;
 
    int id = 0;            // hokuyo measurement id
 
-   // Testvariables
-   bool test = 0;
-   bool test1 = 0;
-   int max_tmp;
-   int min_tmp;
-
-   unsigned int tmp = 0;
-
-
    // Colorlevels
    int cLevel1 = 2500;
    int cLevel2 = 3000;
@@ -84,7 +75,31 @@ using namespace obvious;
    double max_y = 200.0;
    double max_z = 200.0;
 
+   // Filter variables
+   double lineColor[2];
+   double mirrorPlaneColor[2];
+   unsigned int mirrorPlaneSize_X = 10;
+   unsigned int mirrorPlaneSize_Y = 10;
+   double* minIntensCoord;
+   unsigned char* minIntensColor;
+   double* maxIntensCoord;
+   unsigned char* maxIntensColor;
+   double min_intensity;
+   double max_intensity;
+   double** maxIntensityPos;
+
+
+   // Test variables
    unsigned int testFktCount = 0;
+
+   bool test = 0;
+   bool test1 = 0;
+   int max_tmp;
+   int min_tmp;
+   unsigned int tmp = 0;
+
+
+
 void testfkt()
 {
   cout << " was here " << testFktCount << endl;
@@ -102,6 +117,28 @@ void init(int argc, char* argv[])
    file = argv[1];
    filetype = argv[2];
   }
+
+  // Variables:
+  lineColor[0] = 100;
+  lineColor[1] = 100;
+  lineColor[2] = 100;
+
+  mirrorPlaneColor[0] = 100;
+  mirrorPlaneColor[1] = 100;
+  mirrorPlaneColor[2] = 100;
+
+  minIntensCoord   = new double[2];
+  minIntensColor   = new unsigned char[2];
+  maxIntensCoord   = new double[2];
+  maxIntensColor   = new unsigned char[2];
+  double** sensorPos = new double*[0];
+  sensorPos[0]= new double[2];
+  sensorPos[0][0] = 0.0;
+  sensorPos[0][1] = 0.0;
+  sensorPos[0][2] = 0.0;
+
+  maxIntensityPos = new double* [0];
+  maxIntensityPos[0]= new double[2];
 }
 
 void initShowCloud()
@@ -212,22 +249,17 @@ void filter(double* distance, unsigned char* colors, double* intensity, int clou
   unsigned int id_orig = 0;
 
   // Find maximum and minimum
-  double min_intensity = intensity[0];
-  double* minIntensCoord;
-  unsigned char* minIntensColor;
-  minIntensCoord   = new double[2];
-  minIntensColor   = new unsigned char[2];
+  min_intensity = intensity[0];
+
+
   minIntensCoord[0] = distance[0];
   minIntensCoord[0+1] = distance[1];
   minIntensCoord[0+2] = distance[2];
   minIntensColor[0] = colors[0];
   minIntensColor[0+1] = colors[1];
   minIntensColor[0+2] = colors[2];
-  double max_intensity = intensity[0];
-  double* maxIntensCoord;
-  unsigned char* maxIntensColor;
-  maxIntensCoord   = new double[2];
-  maxIntensColor   = new unsigned char[2];
+  max_intensity = intensity[0];
+
   maxIntensCoord[0] = distance[0];
   maxIntensCoord[0+1] = distance[1];
   maxIntensCoord[0+2] = distance[2];
@@ -260,41 +292,34 @@ void filter(double* distance, unsigned char* colors, double* intensity, int clou
   }
 
   cout << "Min: " << min_intensity << " Koordinaten: " << minIntensCoord[0] << " / " << minIntensCoord[1] << " / " << minIntensCoord[2] << endl;
-  cout << "max: " << max_intensity << " Koordinaten: " << maxIntensCoord[0] << " / " << maxIntensCoord[1] << " / " << maxIntensCoord[2] << endl;
-
+  cout << "Max: " << max_intensity << " Koordinaten: " << maxIntensCoord[0] << " / " << maxIntensCoord[1] << " / " << maxIntensCoord[2] << endl;
 
   // Find total reflection
+  maxIntensityPos[0][0] = maxIntensCoord[0];
+  maxIntensityPos[0][1] = maxIntensCoord[1];
+  maxIntensityPos[0][2] = maxIntensCoord[2];
 
-  //void addLines(double** coordsStart, double** coordsEnd, unsigned int size, double rgb[]=0);
-
-  double** sPos = new double*[0];
-  sPos[0]=new double[2];
-  sPos[0][0] = 0.0;
-  sPos[0][1] = 0.0;
-  sPos[0][2] = 0.0;
-
-  double** ePos = new double* [2];
-  ePos[0]=new double[2];
-  ePos[0][0] = maxIntensCoord[0];
-  ePos[0][1] = maxIntensCoord[1];
-  ePos[0][2] = maxIntensCoord[2];
-
-cout << " " << ePos[0][0] << " " << maxIntensCoord[0] << endl;
-  double lineColor[2];// = new double[2];
-  lineColor[0] = 100;
-  lineColor[1] = 100;
-  lineColor[2] = 100;
-  unsigned int linesize = 4;
-//TODO: Problems HERE!!!!
-  viewer3D->addLines(sPos, ePos, linesize, lineColor);
+  viewer3D->addLines(&sensorPos, maxIntensityPos, 1, lineColor);
 
 
-// max_intensity
-//maxIntensCoord[0]
-//maxIntensCoord[1]
-//maxIntensCoord[2]
+// Mirror Plane
+  //addPlane(double origin[3], double axis1[3], double axis2[3], unsigned int resX, unsigned int resY, double rgb[])
 
-//   void addLines(double** coordsStart, double** coordsEnd, unsigned int size, double rgb[]=0);
+  double axis1[3];
+  axis1[0] = 0.0;
+  axis1[1] = 0.0;
+  axis1[2] = 0.0;
+  axis1[3] = 1.0;
+
+  double axis2[3];
+  axis2[0] = 0.0;
+  axis2[1] = 0.0;
+  axis2[2] = 10.0;
+  axis2[3] = 1.0;
+
+//  testfkt;
+  viewer3D->addPlane(maxIntensCoord, axis1, axis2, mirrorPlaneSize_X, mirrorPlaneSize_Y, mirrorPlaneColor);
+//  testfkt;
 
 
 //    for(int i=0; i<=cloudsize; i++)
