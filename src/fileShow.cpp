@@ -66,8 +66,8 @@ using namespace obvious;
    int id = 0;            // hokuyo measurement id
 
    // Colorlevels
-   int cLevel1 = 2500;
-   int cLevel2 = 3000;
+   int cLevel1 = 3000;
+   int cLevel2 = 3500;
 
    // boundry box for measurements
    // values are limits for pos. and neg. distance
@@ -76,8 +76,8 @@ using namespace obvious;
    double max_z = 200.0;
 
    // Filter variables
-   double lineColor[2];
-   double mirrorPlaneColor[2];
+   double lineColor[3];
+   double mirrorPlaneColor[3];
    unsigned int mirrorPlaneSize_X = 10;
    unsigned int mirrorPlaneSize_Y = 10;
    double* minIntensCoord;
@@ -123,22 +123,22 @@ void init(int argc, char* argv[])
   lineColor[1] = 100;
   lineColor[2] = 100;
 
-  mirrorPlaneColor[0] = 100;
-  mirrorPlaneColor[1] = 100;
-  mirrorPlaneColor[2] = 100;
+  mirrorPlaneColor[0] = 50;
+  mirrorPlaneColor[1] = 50;
+  mirrorPlaneColor[2] = 0;
 
-  minIntensCoord   = new double[2];
-  minIntensColor   = new unsigned char[2];
-  maxIntensCoord   = new double[2];
-  maxIntensColor   = new unsigned char[2];
-  double** sensorPos = new double*[0];
-  sensorPos[0]= new double[2];
+  minIntensCoord   = new double[3];
+  minIntensColor   = new unsigned char[3];
+  maxIntensCoord   = new double[3];
+  maxIntensColor   = new unsigned char[3];
+  double** sensorPos = new double*[1];
+  sensorPos[0]= new double[3];
   sensorPos[0][0] = 0.0;
   sensorPos[0][1] = 0.0;
   sensorPos[0][2] = 0.0;
 
-  maxIntensityPos = new double* [0];
-  maxIntensityPos[0]= new double[2];
+  maxIntensityPos = new double* [1];
+  maxIntensityPos[0]= new double[3];
 }
 
 void initShowCloud()
@@ -248,10 +248,8 @@ void filter(double* distance, unsigned char* colors, double* intensity, int clou
 
   unsigned int id_orig = 0;
 
-  // Find maximum and minimum
+// Find maximum and minimum intensity
   min_intensity = intensity[0];
-
-
   minIntensCoord[0] = distance[0];
   minIntensCoord[0+1] = distance[1];
   minIntensCoord[0+2] = distance[2];
@@ -259,7 +257,6 @@ void filter(double* distance, unsigned char* colors, double* intensity, int clou
   minIntensColor[0+1] = colors[1];
   minIntensColor[0+2] = colors[2];
   max_intensity = intensity[0];
-
   maxIntensCoord[0] = distance[0];
   maxIntensCoord[0+1] = distance[1];
   maxIntensCoord[0+2] = distance[2];
@@ -291,96 +288,75 @@ void filter(double* distance, unsigned char* colors, double* intensity, int clou
     }
   }
 
-  cout << "Min: " << min_intensity << " Koordinaten: " << minIntensCoord[0] << " / " << minIntensCoord[1] << " / " << minIntensCoord[2] << endl;
-  cout << "Max: " << max_intensity << " Koordinaten: " << maxIntensCoord[0] << " / " << maxIntensCoord[1] << " / " << maxIntensCoord[2] << endl;
+  //cout << "Min: " << min_intensity << " Koordinaten: " << minIntensCoord[0] << " / " << minIntensCoord[1] << " / " << minIntensCoord[2] << endl;
+  //cout << "Max: " << max_intensity << " Koordinaten: " << maxIntensCoord[0] << " / " << maxIntensCoord[1] << " / " << maxIntensCoord[2] << endl;
 
-  // Find total reflection
+
+// add line to total reflection point
   maxIntensityPos[0][0] = maxIntensCoord[0];
   maxIntensityPos[0][1] = maxIntensCoord[1];
   maxIntensityPos[0][2] = maxIntensCoord[2];
 
   viewer3D->addLines(&sensorPos, maxIntensityPos, 1, lineColor);
 
-
 // Mirror Plane
-  //addPlane(double origin[3], double axis1[3], double axis2[3], unsigned int resX, unsigned int resY, double rgb[])
+  /* Points to build up mirror plane from max Intensity Point */
+//  double point1[3];
+//  point1[0] = maxIntensCoord[0]-maxIntensCoord[1];
+//  point1[1] = maxIntensCoord[0]+maxIntensCoord[1];
+//  point1[2] = 0;
+//  double point2[3];
+//  point2[0] = maxIntensCoord[0];
+//  point2[1] = maxIntensCoord[1];
+//  point2[2] = 50;
+//  // move origin of mirror
+//  double origin[3];
+//  origin[0] = maxIntensCoord[0];
+//  origin[1] = maxIntensCoord[1];
+//  origin[2] = maxIntensCoord[2];
 
+  /* Points to build up mirror plane with max Intensity Point at center */
+  double origin[3];
+  origin[0] = maxIntensCoord[0]+maxIntensCoord[1];
+  origin[1] = -maxIntensCoord[0]-maxIntensCoord[1];
+  origin[2] = -50;
+  double point1[3];
+  point1[0] = maxIntensCoord[0]-maxIntensCoord[1];
+  point1[1] = maxIntensCoord[0]+maxIntensCoord[1];
+  point1[2] = -50;
+  double point2[3];
+  point2[0] = origin[0];
+  point2[1] = origin[1];
+  point2[2] = 50;
 
-  double axis1[3];
-  axis1[0] = 0.0;
-  axis1[1] = 0.0;
-  axis1[2] = 0.0;
-  axis1[3] = 1.0;
+//  cout << "Origin/Max: " << " Koordinaten: " << maxIntensCoord[0] << " / " << maxIntensCoord[1] << " / " << maxIntensCoord[2] << endl;
+//  cout << "Point 1: " << " Koordinaten: " << point1[0] << " / " << point1[1] << " / " << point1[2] << endl;
+//  cout << "Point 2: " << " Koordinaten: " << point2[0] << " / " << point2[1] << " / " << point2[2] << endl;
 
-  double axis2[3];
-  axis2[0] = 0.0;
-  axis2[1] = 0.0;
-  axis2[2] = 10.0;
-  axis2[3] = 1.0;
+  viewer3D->addPlane(origin, point1, point2, mirrorPlaneSize_X, mirrorPlaneSize_Y, mirrorPlaneColor);
 
-//  testfkt;
-  viewer3D->addPlane(maxIntensCoord, axis1, axis2, mirrorPlaneSize_X, mirrorPlaneSize_Y, mirrorPlaneColor);
-//  testfkt;
+// find points behind mirror plane
+  for(int i=0; i<cloudsize; i++)
+  {
 
+    //TODO: Finish here
+    if(data_scan[3*i] >= (1))/*x value of line*/
+    {
+      if(data_scan[3*i+1] >= (2))/*x value of line*/
+      {
+        data_mirror[3*i] = data_scan[i];
+        data_mirror[3*i+1] = data_scan[3*i+1];
+        data_mirror[3*i+2] = data_scan[3*i+2];
 
-//    for(int i=0; i<=cloudsize; i++)
-//    {
-//      // threshold for intensity
-//      if(intensity[i] > 2700)
-//      {
-//        // recalculate original point id
-//        id_orig = abs(cloudsize_scan-i);
-////           cout << "id_refl: " << i << " id_orig: " << id_orig << endl;
-//
-//        // calculate vector
-//        //TODO: later expand with z => sqrt(x2+y2+z2)
-//        distance_refl = sqrt(((distance[3*i])*(distance[3*i])) + (distance[3*i+1]*distance[3*i+1]));
-//        angle_refl_g = asin(distance[3*i]/distance_refl*1.0)/M_PI*360;
-//        angle_refl = asin(distance[3*i]/distance_refl*1.0);
-//
-//        distance_orig = sqrt(((distance[3*id_orig])*(distance[3*id_orig])) + (distance[3*id_orig+1]*distance[3*id_orig+1]));
-//        angle_orig_g = abs(360.0-angle_refl);
-//        angle_refl = M_PI-asin(distance[3*i]/distance_refl*1.0);
-//
-//
-//        // mark reflected point
-//        colors[3*i]     = 100;                         // r
-//        colors[3*i +1]   = 0;                     // g
-//        colors[3*i +2]   = 0;                         // b
-//
-////        // mark original point
-////        colors_scan[3*id_orig]     = 100;                         // r
-////        colors_scan[3*id_orig +1]   = 0;                     // g
-////        colors_scan[3*id_orig +2]   = 100;                         // b
-//
-//        // calculate mirror plane
-//        data_mirror[3*i] = abs(distance_orig-distance_refl)*sin(angle_refl);
-//        data_mirror[3*i+1] = abs(distance_orig-distance_refl)*cos(angle_refl);
-//        data_mirror[3*i+2] = 0;
-//
-//        colors_mirror[3*i]     = 50;                         // r
-//        colors_mirror[3*i +1]   = 200;                     // g
-//        colors_mirror[3*i +2]   = 50;                         // b
-//
-//        if(test==0)
-//        {
-//          cout << " dist ref: " << distance_refl << " dist orig: " << distance_orig << endl;
-//          cout << " id_refl: " << i << " id_orig: " << id_orig << endl;
-//          cout << " angl_refl: " << angle_refl << " angl_orig: " << angle_orig << endl;
-//          cout << " angl_refl: " << angle_refl_g << "° angl_orig: " << angle_orig_g << "°" << endl;
-//          cout << " x_refl: " << distance[3*i] << " y_ref: " << distance[3*i+1] << endl;
-//          //cout << " x_orig: " << distance[3*id_orig] << " y_orig: " << distance[3*id_orig+1] << endl;
-//          cout << " x_mirr: " << data_mirror[3*i] << " y_mirr: " << data_mirror[3*i+1] << endl << endl << endl;
-//        }
-//      }
-//
-//    test = 1;
-
-//    /* Set recalculated mirro plane */
-//    cloud_mirror->setCoords(data_mirror, cloudsize, 3);
-//    cloud_mirror->setColors(colors_mirror, cloudsize, 3);
-
-//  }
+        colors_mirror[3*i]     = 250;                         // r
+        colors_mirror[3*i +1]   = 0;                     // g
+        colors_mirror[3*i +2]   = 0;                         // b
+      }
+    }
+  }
+  /* mark points behind mirror plan */
+  cloud_mirror->setCoords(data_mirror, cloudsize, 3);
+  cloud_mirror->setColors(colors_mirror, cloudsize, 3);
 
   }
 void boundryBox()
