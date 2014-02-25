@@ -62,6 +62,7 @@ using namespace obvious;
    bool _pause = false;
    bool _filterSwitch = false;
    bool _pointReducer = false;
+   bool _pointRIntensityShow = false;
 
    int id = 0;            // hokuyo measurement id
 
@@ -78,8 +79,8 @@ using namespace obvious;
    // Filter variables
    double lineColor[3];
    double mirrorPlaneColor[3];
-   unsigned int mirrorPlaneSize_X = 10;
-   unsigned int mirrorPlaneSize_Y = 10;
+   unsigned int mirrorPlaneSize_X = 1;
+   unsigned int mirrorPlaneSize_Y = 1;
    double* minIntensCoord;
    unsigned char* minIntensColor;
    double* maxIntensCoord;
@@ -236,6 +237,62 @@ void createCube(int cubesize)
   cloud_sensor->setColors(color_cube, (cubesize*cubesize*cubesize), 3);
 }
 
+void deltectMirroredPoints(double* cloud, int size, double origin[3], double axis1[3], double axis2[3])
+{
+  // linevektor[] = origin[]-axis1[]
+  // line[] = origin[] + lamda * linevektor[]
+  // => lamda = (line[] - origin[] ) / linevektor[]
+  double lamda;
+  double linevektor [3];
+  double y_line;
+
+  linevektor[0] = origin[0] - axis1[0];
+  linevektor[1] = origin[1] - axis1[1];
+  linevektor[2] = origin[2] - axis1[2];
+
+  for(int i=0; i < size; i++)
+  {
+    // calculate lamda / point on the mirror line at x value of cloud
+    lamda = (cloud[3*i] - origin[0]) / linevektor[0];
+    // calculate y value on the line
+    y_line = (lamda * linevektor[1]) + origin[1];
+
+    if((lamda == 1) and (y_line == cloud[3*i+1]))  // point located mirror plane => mirror
+    {
+      data_mirror[3*i] = cloud[3*i];
+      data_mirror[3*i+1] = cloud[3*i+1];
+      data_mirror[3*i+2] = cloud[3*i+2];
+
+      colors_mirror[3*i]     = 0;                         // r
+      colors_mirror[3*i +1]   = 0;                     // g
+      colors_mirror[3*i +2]   = 250;                         // b
+    }
+    else if(((y_line < 0) && (y_line > cloud[3*i+1])) or ((y_line > 0) && (y_line < cloud[3*i+1]))) // point located behind mirror plane => mirrored point
+    {
+      data_mirror[3*i] = cloud[3*i];
+      data_mirror[3*i+1] = cloud[3*i+1];
+      data_mirror[3*i+2] = cloud[3*i+2];
+
+      colors_mirror[3*i]     = 250;                         // r
+      colors_mirror[3*i +1]   = 0;                     // g
+      colors_mirror[3*i +2]   = 0;                         // b
+    }
+    else // point located infront of mirror plane => correct
+    {
+      data_mirror[3*i] = cloud[3*i];
+      data_mirror[3*i+1] = cloud[3*i+1];
+      data_mirror[3*i+2] = cloud[3*i+2];
+
+      colors_mirror[3*i]     = 0;                         // r
+      colors_mirror[3*i +1]   = 250;                     // g
+      colors_mirror[3*i +2]   = 0;                         // b
+    }
+
+
+  }
+}
+
+
 void filter(double* distance, unsigned char* colors, double* intensity, int cloudsize)
 {
   float distance_refl = 0.0;
@@ -336,24 +393,8 @@ void filter(double* distance, unsigned char* colors, double* intensity, int clou
   viewer3D->addPlane(origin, point1, point2, mirrorPlaneSize_X, mirrorPlaneSize_Y, mirrorPlaneColor);
 
 // find points behind mirror plane
-  for(int i=0; i<cloudsize; i++)
-  {
+   deltectMirroredPoints(data_scan, cloudsize_scan, origin, point1, point2);
 
-    //TODO: Finish here
-    if(data_scan[3*i] >= (1))/*x value of line*/
-    {
-      if(data_scan[3*i+1] >= (2))/*x value of line*/
-      {
-        data_mirror[3*i] = data_scan[i];
-        data_mirror[3*i+1] = data_scan[3*i+1];
-        data_mirror[3*i+2] = data_scan[3*i+2];
-
-        colors_mirror[3*i]     = 250;                         // r
-        colors_mirror[3*i +1]   = 0;                     // g
-        colors_mirror[3*i +2]   = 0;                         // b
-      }
-    }
-  }
   /* mark points behind mirror plan */
   cloud_mirror->setCoords(data_mirror, cloudsize, 3);
   cloud_mirror->setColors(colors_mirror, cloudsize, 3);
@@ -470,31 +511,10 @@ int load_xyi_file(char* filename)
 
           intensity_scan[linesFile] = intensity;
 
+          colors_scan[3*linesFile]     = 100;                         // r
+          colors_scan[3*linesFile+1]   = 100;                     // g
+          colors_scan[3*linesFile+2]   = 100;                         // b
 
-          if(intensity<= cLevel1)
-          {
-            colors_scan[3*linesFile]     = 100;                         // r
-            colors_scan[3*linesFile+1]   = 0;                     // g
-            colors_scan[3*linesFile+2]   = 0;                         // b
-          }
-          else if ((intensity > cLevel1) && (intensity<= cLevel2))
-          {
-            colors_scan[3*linesFile]     = 0;                         // r
-            colors_scan[3*linesFile+1]   = 100;                     // g
-            colors_scan[3*linesFile+2]   = 0;                         // b
-          }
-          else if (intensity > cLevel2)
-          {
-            colors_scan[3*linesFile]     = 100;                         // r
-            colors_scan[3*linesFile+1]   = 100;                     // g
-            colors_scan[3*linesFile+2]   = 100;                         // b
-
-            int abs_id = abs(id-512);
-            colors_scan[3*abs_id ]     = 100;                         // r
-            colors_scan[3*abs_id +1]   = 100;                     // g
-            colors_scan[3*abs_id +2]   = 100;                         // b
-
-          }
         //  cout << "data_scan id: " << linesFile << " x: " << data_scan[3*linesFile] << " y: " << data_scan[3*linesFile+1] << " int: " << intensity_scan[linesFile] << endl;
           linesFile++;
          }
@@ -792,6 +812,43 @@ void cbPointReducerEnable()
     cout << "Point reduction off!" << endl;
   initShowCloud();
 }
+void cbIntensityColor()
+{
+  _pointRIntensityShow = !_pointRIntensityShow;
+  if(_pointRIntensityShow)
+  {
+    for(int i=0; i<cloudsize_scan; i++)
+    {
+      if(intensity_scan[i]<= cLevel1)
+      {
+        colors_scan[3*i]     = 100;                         // r
+        colors_scan[3*i+1]   = 100;                     // g
+        colors_scan[3*i+2]   = 100;                         // b
+      }
+      else if ((intensity_scan[i] > cLevel1) && (intensity_scan[i]<= cLevel2))
+      {
+        colors_scan[3*i]     = 0;                         // r
+        colors_scan[3*i+1]   = 200;                     // g
+        colors_scan[3*i+2]   = 0;                         // b
+      }
+      else if (intensity_scan[i] > cLevel2)
+      {
+        colors_scan[3*i]     = 200;                         // r
+        colors_scan[3*i+1]   = 0;                     // g
+        colors_scan[3*i+2]   = 0;                         // b
+       }
+    }
+  }
+  else
+  {
+    for(int i=0; i<cloudsize_scan; i++)
+      {
+        colors_scan[3*i]     = 100;                         // r
+        colors_scan[3*i+1]   = 100;                     // g
+        colors_scan[3*i+2]   = 100;                         // b
+      }
+  }
+}
 
 int main(int argc, char* argv[])
 {
@@ -815,7 +872,10 @@ int main(int argc, char* argv[])
    viewer3D->registerKeyboardCallback("1", cbPointReducerEnable); // enable and disable point reduction
    viewer3D->registerKeyboardCallback("d", cbPointReduce); // reduce amount of shown points
    viewer3D->registerKeyboardCallback("i", cbPointIncrease); // increase amount of shown points
+   viewer3D->registerKeyboardCallback("c", cbIntensityColor); // color the data points depending on their intensity
+
    cout << "VTK vierwer init" << endl;
+
 
 /* Load data */
    if(filetype.compare("rxp")==0)

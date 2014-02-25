@@ -41,10 +41,15 @@ int load_xyz_file(char* filename);
  * */
 int load_rxp_file(char* filename);
 
+
+
 /*
  * filter to detect reflections
  * */
 void filter(double* distance, unsigned char* colors, double* intensity, int cloudsize);
+void deltectMirroredPoints(double* cloud, int size, double origin[3], double axis1[3], double axis2[3]);
+
+
 /*
  * max. limits for data
  */
@@ -56,7 +61,10 @@ void boundryBox();
 void cbPointIncrease();
 void cbPointReduce();
 void cbPointReducerEnable();
-
+/*
+ * mark the data point with a color depending on his intensity
+ */
+void cbIntensityColor();
 
 void initShowCloud();
 void createShowCloud();
