@@ -239,57 +239,113 @@ void createCube(int cubesize)
 
 void deltectMirroredPoints(double* cloud, int size, double origin[3], double axis1[3], double axis2[3])
 {
-  // linevektor[] = origin[]-axis1[]
-  // line[] = origin[] + lamda * linevektor[]
-  // => lamda = (line[] - origin[] ) / linevektor[]
+  // line[] = origin[] + lamda * (origin[]-axis1[])
+  // => lamda = (line[] - origin[] ) / (origin[]-axis1[])
   double lamda;
-  double linevektor [3];
-  double y_line;
+  double n_mirror[3];
+  double v_axis1[3];
+  double v_axis2[3];
+  double line[3];
 
-  linevektor[0] = origin[0] - axis1[0];
-  linevektor[1] = origin[1] - axis1[1];
-  linevektor[2] = origin[2] - axis1[2];
+  // calculate normal vector of mirror
+  v_axis1[0] = axis1[0] - origin[0];
+  v_axis1[1] = axis1[1] - origin[1];
+  v_axis1[2] = axis1[2] - origin[2];
+
+  v_axis2[0] = axis2[0] - origin[0];
+  v_axis2[1] = axis2[1] - origin[1];
+  v_axis2[2] = axis2[2] - origin[2];
+
+  n_mirror[0] = v_axis1[1] * v_axis2[2] - v_axis1[2] * v_axis2[1];
+  n_mirror[1] = v_axis1[2] * v_axis2[0] - v_axis1[0] * v_axis2[2];
+  n_mirror[2] = v_axis1[0] * v_axis2[1] - v_axis1[1] * v_axis2[0];
+
 
   for(int i=0; i < size; i++)
   {
     // calculate lamda / point on the mirror line at x value of cloud
-    lamda = (cloud[3*i] - origin[0]) / linevektor[0];
-    // calculate y value on the line
-    y_line = (lamda * linevektor[1]) + origin[1];
-
-    if((lamda == 1) and (y_line == cloud[3*i+1]))  // point located mirror plane => mirror
+    if(n_mirror[1] != 0) // otherwise mirror is parallel to x axis
     {
-      data_mirror[3*i] = cloud[3*i];
-      data_mirror[3*i+1] = cloud[3*i+1];
-      data_mirror[3*i+2] = cloud[3*i+2];
+      lamda = (cloud[3*i] - origin[0]) / (origin[0] - axis1[0]);
+      // calculate y value on the line
+      line[1] = origin[1] + (lamda * (origin[1] - axis1[1]));
 
-      colors_mirror[3*i]     = 0;                         // r
-      colors_mirror[3*i +1]   = 0;                     // g
-      colors_mirror[3*i +2]   = 250;                         // b
+// TODO: Expand to check also z-value => check for plane
+// TODO: Expand to check only for lamda < 1 => origin, axis1 and axis2 are exactly corner points of the mirror! => mirror is not a endless plane anymore, but a fixed size plane
+      // Check points on location
+      if(cloud[3*i+1] == line[1]) // Point on mirror line
+      {
+        data_mirror[3*i] = cloud[3*i];
+        data_mirror[3*i+1] = cloud[3*i+1];
+        data_mirror[3*i+2] = cloud[3*i+2];
+
+        colors_mirror[3*i]     = 0;                         // r
+        colors_mirror[3*i +1]   = 0;                     // g
+        colors_mirror[3*i +2]   = 250;                         // b
+      }
+      else if((cloud[3*i+1] > line[1]) && (n_mirror[1] > 0) or
+              (cloud[3*i+1] < line[1]) && (n_mirror[1] < 0))      // Point behind mirror plane
+      {
+        data_mirror[3*i] = cloud[3*i];
+        data_mirror[3*i+1] = cloud[3*i+1];
+        data_mirror[3*i+2] = cloud[3*i+2];
+
+        colors_mirror[3*i]     = 250;                         // r
+        colors_mirror[3*i +1]   = 0;                     // g
+        colors_mirror[3*i +2]   = 0;                         // b
+      }
+      else  // regular point
+      {
+        data_mirror[3*i] = 0;
+        data_mirror[3*i+1] = 0;
+        data_mirror[3*i+2] = 0;
+
+        colors_mirror[3*i]     = 0;                         // r
+        colors_mirror[3*i +1]   = 0;                     // g
+        colors_mirror[3*i +2]   = 0;                         // b
+       }
     }
-    else if(((y_line < 0) && (y_line > cloud[3*i+1])) or ((y_line > 0) && (y_line < cloud[3*i+1]))) // point located behind mirror plane => mirrored point
+    else if(n_mirror[1] == 0)
     {
-      data_mirror[3*i] = cloud[3*i];
-      data_mirror[3*i+1] = cloud[3*i+1];
-      data_mirror[3*i+2] = cloud[3*i+2];
+      line[0] = origin[0];
+      // Check points on location
+      if(cloud[3*i] == line[0]) // Point on mirror line
+      {
+        data_mirror[3*i] = cloud[3*i];
+        data_mirror[3*i+1] = cloud[3*i+1];
+        data_mirror[3*i+2] = cloud[3*i+2];
 
-      colors_mirror[3*i]     = 250;                         // r
-      colors_mirror[3*i +1]   = 0;                     // g
-      colors_mirror[3*i +2]   = 0;                         // b
+        colors_mirror[3*i]     = 0;                         // r
+        colors_mirror[3*i +1]   = 0;                     // g
+        colors_mirror[3*i +2]   = 250;                         // b
+      }
+      else if((cloud[3*i] > line[0]) && (n_mirror[0] > 0) or
+          (cloud[3*i] < line[0]) && (n_mirror[0] < 0))
+      {
+        data_mirror[3*i] = cloud[3*i];
+        data_mirror[3*i+1] = cloud[3*i+1];
+        data_mirror[3*i+2] = cloud[3*i+2];
+
+        colors_mirror[3*i]     = 250;                         // r
+        colors_mirror[3*i +1]   = 0;                     // g
+        colors_mirror[3*i +2]   = 0;                         // b
+      }
+      else  // regular point
+      {
+        data_mirror[3*i] = 0;
+        data_mirror[3*i+1] = 0;
+        data_mirror[3*i+2] = 0;
+
+        colors_mirror[3*i]     = 0;                         // r
+        colors_mirror[3*i +1]   = 0;                     // g
+        colors_mirror[3*i +2]   = 0;                         // b
+       }
     }
-    else // point located infront of mirror plane => correct
+    else
     {
-      data_mirror[3*i] = cloud[3*i];
-      data_mirror[3*i+1] = cloud[3*i+1];
-      data_mirror[3*i+2] = cloud[3*i+2];
-
-      colors_mirror[3*i]     = 0;                         // r
-      colors_mirror[3*i +1]   = 250;                     // g
-      colors_mirror[3*i +2]   = 0;                         // b
+      cout << "Mirro plane not possible 1" << endl;
     }
-
-
-  }
+   }
 }
 
 
