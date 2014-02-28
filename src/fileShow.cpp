@@ -72,9 +72,7 @@ using namespace obvious;
 
    // boundry box for measurements
    // values are limits for pos. and neg. distance
-   double max_x = 200.0;
-   double max_y = 200.0;
-   double max_z = 200.0;
+   double boundryvalues[3];
 
    // Filter variables
    double lineColor[3];
@@ -120,6 +118,11 @@ void init(int argc, char* argv[])
   }
 
   // Variables:
+  boundryvalues[0] = 50;
+  boundryvalues[1] = 50;
+  boundryvalues[2] = 50;
+
+
   lineColor[0] = 100;
   lineColor[1] = 100;
   lineColor[2] = 100;
@@ -202,6 +205,37 @@ void createShowCloud()
   cloud_show->setColors(colors_show, cloudsize_show, 3);
 }
 
+void setAsMirrorPoint(int n, double* testpoint)
+{
+  data_mirror[3*n] = testpoint[3*n];
+  data_mirror[3*n+1] = testpoint[3*n+1];
+  data_mirror[3*n+2] = testpoint[3*n+2];
+
+  colors_mirror[3*n]     = 250;                         // r
+  colors_mirror[3*n +1]   = 0;                     // g
+  colors_mirror[3*n +2]   = 0;                         // b
+}
+void setAsMirror(int n, double* testpoint)
+{
+  data_mirror[3*n] = testpoint[3*n];
+  data_mirror[3*n+1] = testpoint[3*n+1];
+  data_mirror[3*n+2] = testpoint[3*n+2];
+
+  colors_mirror[3*n]     = 0;                         // r
+  colors_mirror[3*n +1]   = 0;                     // g
+  colors_mirror[3*n +2]   = 250;                         // b
+}
+void setAsObject(int n, double* testpoint)
+{
+  data_mirror[3*n] = 0;
+  data_mirror[3*n+1] = 0;
+  data_mirror[3*n+2] = 0;
+
+  colors_mirror[3*n]     = 0;                         // r
+  colors_mirror[3*n +1]   = 0;                     // g
+  colors_mirror[3*n +2]   = 0;                         // b
+}
+
 void createCube(int cubesize)
 {
   //VtkCloud* cloud_cube;
@@ -259,10 +293,12 @@ void deltectMirroredPoints(double* cloud, int size, double origin[3], double axi
   n_mirror[0] = v_axis1[1] * v_axis2[2] - v_axis1[2] * v_axis2[1];
   n_mirror[1] = v_axis1[2] * v_axis2[0] - v_axis1[0] * v_axis2[2];
   n_mirror[2] = v_axis1[0] * v_axis2[1] - v_axis1[1] * v_axis2[0];
+  // TODO: Expand to check only for lamda < 1 => origin, axis1 and axis2 are exactly corner points of the mirror! => mirror is not a endless plane anymore, but a fixed size plane
 
 
   for(int i=0; i < size; i++)
   {
+
     // calculate lamda / point on the mirror line at x value of cloud
     if(n_mirror[1] != 0) // otherwise mirror is parallel to x axis
     {
@@ -270,39 +306,22 @@ void deltectMirroredPoints(double* cloud, int size, double origin[3], double axi
       // calculate y value on the line
       line[1] = origin[1] + (lamda * (origin[1] - axis1[1]));
 
-// TODO: Expand to check also z-value => check for plane
-// TODO: Expand to check only for lamda < 1 => origin, axis1 and axis2 are exactly corner points of the mirror! => mirror is not a endless plane anymore, but a fixed size plane
-      // Check points on location
+      //Check points on location compared to lane
       if(cloud[3*i+1] == line[1]) // Point on mirror line
       {
-        data_mirror[3*i] = cloud[3*i];
-        data_mirror[3*i+1] = cloud[3*i+1];
-        data_mirror[3*i+2] = cloud[3*i+2];
-
-        colors_mirror[3*i]     = 0;                         // r
-        colors_mirror[3*i +1]   = 0;                     // g
-        colors_mirror[3*i +2]   = 250;                         // b
+          setAsMirror(i, cloud);
+          //cout << "Spiegelfläche" endl;
       }
       else if((cloud[3*i+1] > line[1]) && (n_mirror[1] > 0) or
               (cloud[3*i+1] < line[1]) && (n_mirror[1] < 0))      // Point behind mirror plane
       {
-        data_mirror[3*i] = cloud[3*i];
-        data_mirror[3*i+1] = cloud[3*i+1];
-        data_mirror[3*i+2] = cloud[3*i+2];
-
-        colors_mirror[3*i]     = 250;                         // r
-        colors_mirror[3*i +1]   = 0;                     // g
-        colors_mirror[3*i +2]   = 0;                         // b
+          setAsMirrorPoint(i, cloud);
+          //cout << "Spiegelung" endl;
       }
       else  // regular point
       {
-        data_mirror[3*i] = 0;
-        data_mirror[3*i+1] = 0;
-        data_mirror[3*i+2] = 0;
-
-        colors_mirror[3*i]     = 0;                         // r
-        colors_mirror[3*i +1]   = 0;                     // g
-        colors_mirror[3*i +2]   = 0;                         // b
+          setAsObject(i, cloud);
+          //cout << "keine Spiegelung" endl;
        }
     }
     else if(n_mirror[1] == 0)
@@ -311,43 +330,183 @@ void deltectMirroredPoints(double* cloud, int size, double origin[3], double axi
       // Check points on location
       if(cloud[3*i] == line[0]) // Point on mirror line
       {
-        data_mirror[3*i] = cloud[3*i];
-        data_mirror[3*i+1] = cloud[3*i+1];
-        data_mirror[3*i+2] = cloud[3*i+2];
-
-        colors_mirror[3*i]     = 0;                         // r
-        colors_mirror[3*i +1]   = 0;                     // g
-        colors_mirror[3*i +2]   = 250;                         // b
+          setAsMirror(i, cloud);
+          //cout << "Spiegelfläche" endl;
       }
       else if((cloud[3*i] > line[0]) && (n_mirror[0] > 0) or
           (cloud[3*i] < line[0]) && (n_mirror[0] < 0))
       {
-        data_mirror[3*i] = cloud[3*i];
-        data_mirror[3*i+1] = cloud[3*i+1];
-        data_mirror[3*i+2] = cloud[3*i+2];
-
-        colors_mirror[3*i]     = 250;                         // r
-        colors_mirror[3*i +1]   = 0;                     // g
-        colors_mirror[3*i +2]   = 0;                         // b
+          setAsMirrorPoint(i, cloud);
+          //cout << "Spiegelung" endl;
       }
       else  // regular point
       {
-        data_mirror[3*i] = 0;
-        data_mirror[3*i+1] = 0;
-        data_mirror[3*i+2] = 0;
-
-        colors_mirror[3*i]     = 0;                         // r
-        colors_mirror[3*i +1]   = 0;                     // g
-        colors_mirror[3*i +2]   = 0;                         // b
+          setAsObject(i, cloud);
+          //cout << "keine Spiegelung" endl;
        }
     }
     else
     {
-      cout << "Mirro plane not possible 1" << endl;
+      cout << "Mirror lane not possible" << endl;
     }
    }
-}
+  // End check points on location compared to lane
+/*
+    // Check points on location compared to plane
 
+    if(n_mirror[0] < 0)
+    {
+      if(n_mirror[1] < 0)
+      {
+        if(((n_mirror[2] < 0) && (cloud[3*i+2] < line[2])) or
+                ((n_mirror[2] > 0) && (cloud[3*i+2] > line[2])) or
+                  n_mirror[2] == 0)
+        {
+          setAsMirrorPoint(i, cloud);
+          //cout << "Spiegelung" endl;
+        }
+        else
+        {
+          setAsObject(i, cloud);
+          //cout << "keine Spiegelung" endl;
+        }
+      }
+      else if(n_mirror[1] == 0)
+      {
+        if(((n_mirror[2] < 0) && (cloud[3*i+2] < line[2])) or
+                ((n_mirror[2] > 0) && (cloud[3*i+2] > line[2])) or
+                  n_mirror[2] == 0)
+        {
+          setAsMirrorPoint(i, cloud);
+          //cout << "Spiegelung" endl;
+        }
+        else
+        {
+          setAsObject(i, cloud);
+          //cout << "keine Spiegelung" endl;
+        }
+      }
+      else if(n_mirror[1] > 0)
+      {
+        if(((n_mirror[2] < 0) && (cloud[3*i+2] < line[2])) or
+                ((n_mirror[2] > 0) && (cloud[3*i+2] > line[2])) or
+                  n_mirror[2] == 0)
+        {
+          setAsMirrorPoint(i, cloud);
+          //cout << "Spiegelung" endl;
+        }
+        else
+        {
+          setAsObject(i, cloud);
+          //cout << "keine Spiegelung" endl;
+        }
+      }
+    }
+    else if(n_mirror[0] == 0)
+    {
+      if(n_mirror[1] < 0)
+      {
+        if(((n_mirror[2] < 0) && (cloud[3*i+2] < line[2])) or
+                ((n_mirror[2] > 0) && (cloud[3*i+2] > line[2])) or
+                  n_mirror[2] == 0)
+        {
+          setAsMirrorPoint(i, cloud);
+          //cout << "Spiegelung" endl;
+        }
+        else
+        {
+          setAsObject(i, cloud);
+          //cout << "keine Spiegelung" endl;
+        }
+      }
+      else if(n_mirror[1] == 0)
+      {
+        if(n_mirror[2] == 0)
+        {
+          cout << "This mirror plane is not possible!" << endl;
+        }
+        else if(((n_mirror[2] < 0) && (cloud[3*i+2] < line[2])) or
+            ((n_mirror[2] > 0) && (cloud[3*i+2] > line[2])))
+        {
+          setAsMirrorPoint(i, cloud);
+          //cout << "Spiegelung" endl;
+        }
+        else
+        {
+          setAsObject(i, cloud);
+          //cout << "keine Spiegelung" endl;
+        }
+      }
+      else if(n_mirror[1] > 0)
+      {
+        if(((n_mirror[2] < 0) && (cloud[3*i+2] < line[2])) or
+                ((n_mirror[2] > 0) && (cloud[3*i+2] > line[2])) or
+                  n_mirror[2] == 0)
+        {
+          setAsMirrorPoint(i, cloud);
+          //cout << "Spiegelung" endl;
+        }
+        else
+        {
+          setAsObject(i, cloud);
+          //cout << "keine Spiegelung" endl;
+        }
+      }
+
+    }
+    else if(n_mirror[0] > 0)
+    {
+      if(n_mirror[1] < 0)
+      {
+        if(((n_mirror[2] < 0) && (cloud[3*i+2] < line[2])) or
+                ((n_mirror[2] > 0) && (cloud[3*i+2] > line[2])) or
+                  n_mirror[2] == 0)
+        {
+          setAsMirrorPoint(i, cloud);
+          //cout << "Spiegelung" endl;
+        }
+        else
+        {
+          setAsObject(i, cloud);
+          //cout << "keine Spiegelung" endl;
+        }
+      }
+      else if(n_mirror[1] == 0)
+      {
+        if(((n_mirror[2] < 0) && (cloud[3*i+2] < line[2])) or
+                ((n_mirror[2] > 0) && (cloud[3*i+2] > line[2])) or
+                  n_mirror[2] == 0)
+        {
+          setAsMirrorPoint(i, cloud);
+          //cout << "Spiegelung" endl;
+        }
+        else
+        {
+          setAsObject(i, cloud);
+          //cout << "keine Spiegelung" endl;
+        }
+      }
+      else if(n_mirror[1] > 0)
+      {
+        if(((n_mirror[2] < 0) && (cloud[3*i+2] < line[2])) or
+                ((n_mirror[2] > 0) && (cloud[3*i+2] > line[2])) or
+                  n_mirror[2] == 0)
+        {
+          setAsMirrorPoint(i, cloud);
+          //cout << "Spiegelung" endl;
+        }
+        else
+        {
+          setAsObject(i, cloud);
+          //cout << "keine Spiegelung" endl;
+        }
+      }
+    }
+    // End check points on location compared to plane
+  }
+*/
+
+}
 
 void filter(double* distance, unsigned char* colors, double* intensity, int cloudsize)
 {
@@ -413,21 +572,6 @@ void filter(double* distance, unsigned char* colors, double* intensity, int clou
   viewer3D->addLines(&sensorPos, maxIntensityPos, 1, lineColor);
 
 // Mirror Plane
-  /* Points to build up mirror plane from max Intensity Point */
-//  double point1[3];
-//  point1[0] = maxIntensCoord[0]-maxIntensCoord[1];
-//  point1[1] = maxIntensCoord[0]+maxIntensCoord[1];
-//  point1[2] = 0;
-//  double point2[3];
-//  point2[0] = maxIntensCoord[0];
-//  point2[1] = maxIntensCoord[1];
-//  point2[2] = 50;
-//  // move origin of mirror
-//  double origin[3];
-//  origin[0] = maxIntensCoord[0];
-//  origin[1] = maxIntensCoord[1];
-//  origin[2] = maxIntensCoord[2];
-
   /* Points to build up mirror plane with max Intensity Point at center */
   double origin[3];
   origin[0] = maxIntensCoord[0]+maxIntensCoord[1];
@@ -455,30 +599,29 @@ void filter(double* distance, unsigned char* colors, double* intensity, int clou
   cloud_mirror->setCoords(data_mirror, cloudsize, 3);
   cloud_mirror->setColors(colors_mirror, cloudsize, 3);
 
-  }
+}
+
 void boundryBox()
 {
-
   for(int i=0; i<cloudsize_scan; i++)
   {
-    //cout << data_scan[3*i] << " " << data_scan[3*i+1] << " " << data_scan[3*i+2] << endl;
-    if((abs(data_scan[3*i]) >= max_x) or (abs(data_scan[3*i+1]) >= max_y) or (abs(data_scan[3*i+2]) >= max_z))
+    cout << data_scan[3*i] << " " << data_scan[3*i+1] << " " << data_scan[3*i+2] << endl;
+    if((abs(data_scan[3*i]) >= boundryvalues[0]) or (abs(data_scan[3*i+1]) >= boundryvalues[1]) or (abs(data_scan[3*i+2]) >= boundryvalues[2]))
     {
       //cout << "was here " << endl;
       data_scan[3*i]       = 0.0;
       data_scan[3*i + 1]   = 0.0;
       data_scan[3*i + 2]   = 0.0;
 
-      colors_scan[3*i]     = 0;                     // r
-      colors_scan[3*i+1]   = 0;                     // g
-      colors_scan[3*i+2]   = 0;                     // b
+      colors_scan[3*i]     = 200;                     // r
+      colors_scan[3*i+1]   = 20;                     // g
+      colors_scan[3*i+2]   = 200;                     // b
 
       intensity_scan[i] = 0;
     }
-    //cout << data_scan[3*i] << " " << data_scan[3*i+1] << " " << data_scan[3*i+2] << endl;
+    cout << data_scan[3*i] << " " << data_scan[3*i+1] << " " << data_scan[3*i+2] << endl;
     i++;
   }
-
 }
 
 int load_xy_file(char* filename)
@@ -826,7 +969,6 @@ public:
 /* Set new cloud*/
       createShowCloud();
       viewer3D->update();
-
     }
 
 private:
@@ -947,10 +1089,8 @@ int main(int argc, char* argv[])
    else
      cout << "Can not load filetype " << filetype << endl;
 
-/* Prefilter data */
-//TODO: Not working yet
-   //boundryBox();
-
+   /* Prefilter data */
+      boundryBox();
 
 /* Create objects */
    initShowCloud();

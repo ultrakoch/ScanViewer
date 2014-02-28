@@ -48,7 +48,12 @@ int load_rxp_file(char* filename);
  * */
 void filter(double* distance, unsigned char* colors, double* intensity, int cloudsize);
 void deltectMirroredPoints(double* cloud, int size, double origin[3], double axis1[3], double axis2[3]);
-
+/*
+ * Functions used in filter to mark the points depending on the location
+ * */
+void setAsMirror(int n, double* testpoint);
+void setAsObject(int n, double* testpoint);
+void setAsMirror(int n, double* testpoint);
 
 /*
  * max. limits for data
@@ -68,3 +73,5 @@ void cbIntensityColor();
 
 void initShowCloud();
 void createShowCloud();
+
+
