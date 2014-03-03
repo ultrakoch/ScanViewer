@@ -38,7 +38,7 @@ using namespace obvious;
    VtkCloud* cloud_mirror;
    VtkCloud* cloud_sensor;
 
-   int reducePoints=5;
+   int showEveryPoint = 20;
 
    int cloudsize_scan;
    int cloudsize_show;
@@ -61,7 +61,7 @@ using namespace obvious;
    Obvious3D* viewer3D = new Obvious3D();
    bool _pause = false;
    bool _filterSwitch = false;
-   bool _pointReducer = false;
+   bool _pointReducer = true;
    bool _pointRIntensityShow = false;
 
    int id = 0;            // hokuyo measurement id
@@ -118,18 +118,18 @@ void init(int argc, char* argv[])
   }
 
   // Variables:
-  boundryvalues[0] = 50;
-  boundryvalues[1] = 50;
-  boundryvalues[2] = 50;
+  boundryvalues[0] = 1000;
+  boundryvalues[1] = 1000;
+  boundryvalues[2] = 1000;
 
 
   lineColor[0] = 100;
   lineColor[1] = 100;
   lineColor[2] = 100;
 
-  mirrorPlaneColor[0] = 50;
-  mirrorPlaneColor[1] = 50;
-  mirrorPlaneColor[2] = 0;
+  mirrorPlaneColor[0] = 100;
+  mirrorPlaneColor[1] = 100;
+  mirrorPlaneColor[2] = 100;
 
   minIntensCoord   = new double[3];
   minIntensColor   = new unsigned char[3];
@@ -145,22 +145,46 @@ void init(int argc, char* argv[])
   maxIntensityPos[0]= new double[3];
 }
 
+void boundryBox()
+{
+  for(int i=0; i<cloudsize_scan; i++)
+  {
+    //cout << data_scan[3*i] << " " << data_scan[3*i+1] << " " << data_scan[3*i+2] << endl;
+    if((abs(data_scan[3*i]) >= boundryvalues[0]) or (abs(data_scan[3*i+1]) >= boundryvalues[1]) or (abs(data_scan[3*i+2]) >= boundryvalues[2]))
+    {
+      //cout << data_scan[3*i] << " " << data_scan[3*i+1] << " " << data_scan[3*i+2] << endl;
+      data_scan[3*i]       = 0;
+      data_scan[3*i + 1]   = 0;
+      data_scan[3*i + 2]   = 0;
+
+      colors_scan[3*i]     = 0;                     // r
+      colors_scan[3*i+1]   = 0;                     // g
+      colors_scan[3*i+2]   = 0;                     // b
+
+      intensity_scan[i] = 0;
+    }
+   // cout << data_scan[3*i] << " " << data_scan[3*i+1] << " " << data_scan[3*i+2] << endl;
+  }
+  cout << "Boundry box: +-x = " << boundryvalues[0] << "mm, +-y = " << boundryvalues[1] << "mm, +-z = " << boundryvalues[2] << " mm" << endl;
+}
+
 void initShowCloud()
 {
   if(_pointReducer)
   {
-    cloudsize_show = cloudsize_scan - (cloudsize_scan /  reducePoints);
+    cloudsize_show = cloudsize_scan / showEveryPoint;
 
     cout << "cloud_scan: " << cloudsize_scan << endl;
     cout << "cloud_show: " << cloudsize_show << endl;
-    cout << "reduce every: " << reducePoints << endl;
-    cout << "Point reducer: " << _pointReducer << endl;
+    cout << "show every: " << showEveryPoint << endl;
+    cout << "Point reducer on" << endl;
 
-  data_show   = new double[cloudsize_show * 3];
-  colors_show = new unsigned char[cloudsize_show * 3];
+    data_show   = new double[cloudsize_show * 3];
+    colors_show = new unsigned char[cloudsize_show * 3];
   }
   else
   {
+    cout << "Point reducer off" << endl;
     cloudsize_show = cloudsize_scan;
     data_show   = new double[cloudsize_show * 3];
     colors_show = new unsigned char[cloudsize_show * 3];
@@ -170,28 +194,28 @@ void createShowCloud()
 {
   int i=0;
   int f=0;
-  int n=0;
-  // Point reducer to show less points than necessary
+  int n=1;
   if(_pointReducer)
   {
     while(i < cloudsize_scan)
     {
-      data_show[3*f] = data_scan[3*i];
-      data_show[3*f+1] = data_scan[3*i+1];
-      data_show[3*f+2] = data_scan[3*i+2];
+      if(n==showEveryPoint)  // Show every n point
+      {
+        data_show[3*f] = data_scan[3*i];
+        data_show[3*f+1] = data_scan[3*i+1];
+        data_show[3*f+2] = data_scan[3*i+2];
 
-      colors_show[3*f] = colors_scan[3*i];
-      colors_show[3*f+1] = colors_scan[3*i+2];
-      colors_show[3*f+2] = colors_scan[3*i+2];
-
-      f++;
-      i = i+1;
-      if(n==reducePoints)
-        n = 0;
+        colors_show[3*f] = colors_scan[3*i];
+        colors_show[3*f+1] = colors_scan[3*i+2];
+        colors_show[3*f+2] = colors_scan[3*i+2];
+        f++;
+        i++;
+        n = 1;
+      }
       else
       {
         n++;
-        i = i+1;
+        i++;
       }
     }
   }
@@ -520,6 +544,7 @@ void filter(double* distance, unsigned char* colors, double* intensity, int clou
 
   unsigned int id_orig = 0;
 
+  //TODO: search not for maximum, search for very high intensities => Multible mirrors detectable
 // Find maximum and minimum intensity
   min_intensity = intensity[0];
   minIntensCoord[0] = distance[0];
@@ -571,20 +596,35 @@ void filter(double* distance, unsigned char* colors, double* intensity, int clou
 
   viewer3D->addLines(&sensorPos, maxIntensityPos, 1, lineColor);
 
-// Mirror Plane
-  /* Points to build up mirror plane with max Intensity Point at center */
-  double origin[3];
-  origin[0] = maxIntensCoord[0]+maxIntensCoord[1];
-  origin[1] = -maxIntensCoord[0]-maxIntensCoord[1];
-  origin[2] = -50;
-  double point1[3];
-  point1[0] = maxIntensCoord[0]-maxIntensCoord[1];
-  point1[1] = maxIntensCoord[0]+maxIntensCoord[1];
-  point1[2] = -50;
-  double point2[3];
-  point2[0] = origin[0];
-  point2[1] = origin[1];
-  point2[2] = 50;
+//// Mirror Lane for 2D
+//  /* Points to build up mirror plane with max Intensity Point at center */
+//  double origin[3];
+//  origin[0] = maxIntensCoord[0]+maxIntensCoord[1];
+//  origin[1] = -maxIntensCoord[0]-maxIntensCoord[1];
+//  origin[2] = -50;
+//  double point1[3];
+//  point1[0] = maxIntensCoord[0]-maxIntensCoord[1];
+//  point1[1] = maxIntensCoord[0]+maxIntensCoord[1];
+//  point1[2] = -50;
+//  double point2[3];
+//  point2[0] = origin[0];
+//  point2[1] = origin[1];
+//  point2[2] = 50;
+
+// Mirror Plane for 3D
+    double origin[3];
+    origin[0] = maxIntensCoord[0];
+    origin[1] = maxIntensCoord[1];
+    origin[2] = maxIntensCoord[2];
+    double point1[3];
+    point1[0] = 2*maxIntensCoord[0];
+    point1[1] = maxIntensCoord[1];
+    point1[2] = maxIntensCoord[2];
+    double point2[3];
+    point2[0] = maxIntensCoord[0];
+    point2[1] = 2*maxIntensCoord[1];
+    point2[2] = maxIntensCoord[2];
+
 
 //  cout << "Origin/Max: " << " Koordinaten: " << maxIntensCoord[0] << " / " << maxIntensCoord[1] << " / " << maxIntensCoord[2] << endl;
 //  cout << "Point 1: " << " Koordinaten: " << point1[0] << " / " << point1[1] << " / " << point1[2] << endl;
@@ -601,28 +641,7 @@ void filter(double* distance, unsigned char* colors, double* intensity, int clou
 
 }
 
-void boundryBox()
-{
-  for(int i=0; i<cloudsize_scan; i++)
-  {
-    cout << data_scan[3*i] << " " << data_scan[3*i+1] << " " << data_scan[3*i+2] << endl;
-    if((abs(data_scan[3*i]) >= boundryvalues[0]) or (abs(data_scan[3*i+1]) >= boundryvalues[1]) or (abs(data_scan[3*i+2]) >= boundryvalues[2]))
-    {
-      //cout << "was here " << endl;
-      data_scan[3*i]       = 0.0;
-      data_scan[3*i + 1]   = 0.0;
-      data_scan[3*i + 2]   = 0.0;
 
-      colors_scan[3*i]     = 200;                     // r
-      colors_scan[3*i+1]   = 20;                     // g
-      colors_scan[3*i+2]   = 200;                     // b
-
-      intensity_scan[i] = 0;
-    }
-    cout << data_scan[3*i] << " " << data_scan[3*i+1] << " " << data_scan[3*i+2] << endl;
-    i++;
-  }
-}
 
 int load_xy_file(char* filename)
 {
@@ -668,7 +687,7 @@ int load_xy_file(char* filename)
          }
       }
       cout << "File " << filename << " with x,y loaded" << endl;
-        return id;
+      return id;
 }
 int load_xyi_file(char* filename)
 {
@@ -967,7 +986,7 @@ public:
         filter(data_scan, colors_scan, intensity_scan, cloudsize_scan);
 
 /* Set new cloud*/
-      createShowCloud();
+     // createShowCloud();
       viewer3D->update();
     }
 
@@ -976,28 +995,29 @@ private:
 };
 void cbPointIncrease()
 {
-  if(reducePoints>5)
+  if(showEveryPoint>1)
   {
-    reducePoints = reducePoints-1;
-    cout << "Increasing " << reducePoints << " Points!" << endl;
+    showEveryPoint = showEveryPoint-1;
+    cout << "Increasing " << showEveryPoint << " Points!" << endl;
     initShowCloud();
   }
   else
   {
-    cout << "No more increasing possible (" << reducePoints << ")" << endl;
+    showEveryPoint = 1;
+    cout << "No more increasing possible (" << showEveryPoint << ")" << endl;
   }
 }
 void cbPointReduce()
 {
-  if(reducePoints<100)
+  if(showEveryPoint<100)
   {
-    reducePoints = reducePoints+1;
-    cout << "Reduceing " << reducePoints << " Points!" << endl;
+    showEveryPoint = showEveryPoint+1;
+    cout << "Reduceing " << showEveryPoint << " Points!" << endl;
     initShowCloud();
   }
   else
   {
-    cout << "No more reduceing possible (" << reducePoints << ")" << endl;
+    cout << "No more reduceing possible (" << showEveryPoint << ")" << endl;
 
   }
 }
@@ -1064,7 +1084,7 @@ int main(int argc, char* argv[])
    vtkSmartPointer<vtkTimerCallback> cb =  vtkSmartPointer<vtkTimerCallback>::New();
    vtkSmartPointer<vtkRenderWindowInteractor> interactor = viewer3D->getWindowInteractor();
    interactor->AddObserver(vtkCommand::TimerEvent, cb);
-   interactor->CreateRepeatingTimer(30);
+   interactor->CreateRepeatingTimer(90);
    // define keyboard callbacks
    viewer3D->registerFlipVariable("f", &_filterSwitch);
    viewer3D->registerKeyboardCallback("1", cbPointReducerEnable); // enable and disable point reduction
@@ -1090,7 +1110,7 @@ int main(int argc, char* argv[])
      cout << "Can not load filetype " << filetype << endl;
 
    /* Prefilter data */
-      boundryBox();
+   boundryBox();
 
 /* Create objects */
    initShowCloud();
