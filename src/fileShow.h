@@ -48,6 +48,8 @@ int load_rxp_file(char* filename);
  * */
 void filter(double* distance, unsigned char* colors, double* intensity, int cloudsize);
 void deltectMirroredPoints(double* cloud, int size, double origin[3], double axis1[3], double axis2[3]);
+double* findPlane(double* cloud, int size, double* planeCenterVektor);
+
 /*
  * Functions used in filter to mark the points depending on the location
  * */

@@ -19,6 +19,16 @@
 #include "obgraphic/Obvious3D.h"
 #include <vector>
 
+
+/* Plane segmentation */
+#include <pcl/ModelCoefficients.h>
+#include <pcl/io/pcd_io.h>
+#include <pcl/point_types.h>
+#include <pcl/sample_consensus/method_types.h>
+#include <pcl/sample_consensus/model_types.h>
+#include <pcl/segmentation/sac_segmentation.h>
+ #include <pcl/sample_consensus/sac_model_parallel_plane.h>
+
 #define _USE_MATH_DEFINES
 
 using namespace std;
@@ -38,7 +48,9 @@ using namespace obvious;
    VtkCloud* cloud_mirror;
    VtkCloud* cloud_sensor;
 
-   int showEveryPoint = 200;
+   bool filter_calculated = 0;
+
+   int showEveryPoint = 500;
 
    int cloudsize_scan;
    int cloudsize_show;
@@ -558,6 +570,79 @@ void deltectMirroredPoints(double* cloud, int size, double origin[3], double axi
 
 }
 
+
+double* findPlane(double* cloud, int size, double* planeCenterVektor)
+{
+  // return planeCloud
+  double* plane;
+  plane = new double[cloudsize_scan * 3];
+
+  // change cloud to pcl cloud
+  pcl::PointCloud<pcl::PointXYZ>::Ptr cloudPCL(new pcl::PointCloud<pcl::PointXYZ>);
+
+  cloudPCL->width  = size;
+  cloudPCL->height = 1;
+  cloudPCL->points.resize (cloudPCL->width * cloudPCL->height);
+
+  for (size_t i = 0; i < size; ++i)
+  {
+    cloudPCL->points[i].x = cloud[3*i];
+    cloudPCL->points[i].y = cloud[3*i+1];
+    cloudPCL->points[i].z = cloud[3*i+2];
+  }
+
+  pcl::ModelCoefficients::Ptr coefficients (new pcl::ModelCoefficients);
+  pcl::PointIndices::Ptr inliers (new pcl::PointIndices);
+
+  // Create the segmentation object
+  pcl::SACSegmentation<pcl::PointXYZ> seg;
+
+  // Optional
+  seg.setOptimizeCoefficients (true);
+
+  // Mandatory
+  seg.setModelType (pcl::SACMODEL_PARALLEL_PLANE );
+  seg.setMethodType (pcl::SAC_RANSAC);
+  seg.setDistanceThreshold (2.1);
+  seg.setMaxIterations (1000);
+
+
+
+  Eigen::Vector3f axis = Eigen::Vector3f(planeCenterVektor[0]/100,-planeCenterVektor[2]/100,planeCenterVektor[1]/100);
+  cout << "Vektor; " << axis[0] << " " << axis[1] << " " << axis[2] << endl;
+  //Eigen::Vector3f axis = Eigen::Vector3f(0.0,-1.0,0.0);
+
+  seg.setAxis(axis);
+  //EpsAngle have to be bigger 0
+  seg.setEpsAngle(10.0f * (M_PI/180.0f) );
+
+  seg.setInputCloud (cloudPCL);
+  seg.segment (*inliers, *coefficients);
+
+  if (inliers->indices.size () == 0)
+  {
+    PCL_ERROR ("Could not estimate a planar model for the given dataset.");
+    return (plane);
+  }
+
+//  std::cerr << "Model coefficients: " << coefficients->values[0] << " "
+//                                      << coefficients->values[1] << " "
+//                                      << coefficients->values[2] << " "
+//                                      << coefficients->values[3] << std::endl;
+//
+//  std::cerr << "Model inliers - Points of plane: " << inliers->indices.size () << std::endl;
+
+  for (size_t i = 0; i < inliers->indices.size (); ++i)
+  {
+    plane [3*i] = cloudPCL->points[inliers->indices[i]].x;
+    plane [3*i+1] = cloudPCL->points[inliers->indices[i]].y;
+    plane [3*i+2] = cloudPCL->points[inliers->indices[i]].z;
+
+  }
+
+  return plane;
+}
+
 void filter(double* distance, unsigned char* colors, double* intensity, int cloudsize)
 {
   float distance_refl = 0.0;
@@ -668,19 +753,36 @@ void filter(double* distance, unsigned char* colors, double* intensity, int clou
     viewer3D->addLines(&sensorPos, mirrorCorner2, 1, lineColorGreen);
     viewer3D->addLines(&sensorPos, mirrorCorner3, 1, lineColorBlue);
 
-
 //  cout << "Origin/Max: " << " Koordinaten: " << maxIntensCoord[0] << " / " << maxIntensCoord[1] << " / " << maxIntensCoord[2] << endl;
 //  cout << "Point 1: " << " Koordinaten: " << point1[0] << " / " << point1[1] << " / " << point1[2] << endl;
 //  cout << "Point 2: " << " Koordinaten: " << point2[0] << " / " << point2[1] << " / " << point2[2] << endl;
 
   viewer3D->addPlane(origin, point1, point2, mirrorPlaneSize_X, mirrorPlaneSize_Y, mirrorPlaneColor);
 
+  double* data_plane;
+  data_plane = new double[cloudsize_scan * 3];
+  unsigned char* colors_plane;
+  colors_plane = new unsigned char[cloudsize_scan * 3];
+  for(int i=1; i<cloudsize; i++)
+  {
+    colors_plane [3*i] = 100;
+    colors_plane [3*i+1] = 0;
+    colors_plane [3*i+2] = 100;
+  }
+
+  data_plane = findPlane(distance, cloudsize_scan, origin);
+
+  cloud_mirror->setCoords(data_plane, cloudsize, 3);
+  cloud_mirror->setColors(colors_plane, cloudsize, 3);
+
+
+
 // find points behind mirror plane
   deltectMirroredPoints(data_scan, cloudsize_scan, point1, point2, origin);
 
   /* mark points behind mirror plan */
-  cloud_mirror->setCoords(data_mirror, cloudsize, 3);
-  cloud_mirror->setColors(colors_mirror, cloudsize, 3);
+//  cloud_mirror->setCoords(data_mirror, cloudsize, 3);
+//  cloud_mirror->setColors(colors_mirror, cloudsize, 3);
 
 }
 
@@ -1025,9 +1127,15 @@ public:
   {
 
 /* Filter */
-      if(_filterSwitch == 1)
+      if(_filterSwitch == 1 && filter_calculated == 0)
+      {
+        filter_calculated = 1;
         filter(data_scan, colors_scan, intensity_scan, cloudsize_scan);
-
+      }
+      else if (_filterSwitch == 0)
+      {
+        filter_calculated = 0;
+      }
 /* Set new cloud*/
      // createShowCloud();
       viewer3D->update();
